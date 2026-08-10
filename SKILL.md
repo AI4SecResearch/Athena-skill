@@ -12,13 +12,17 @@ description: Athena 安全知识库检索：用自然语言查威胁分析/利�
 **CLI**(推荐,内部轮询一次出结果):
 
 ```
+athena projects        # project 没设时先取 pid
 athena ask "<问题>"
 ```
 
 **curl**(无 CLI 时;需自己轮询任务):
 
 ```bash
-B=${ATHENA_BASE_URL:-http://127.0.0.1:8000}; P=$ATHENA_PROJECT_ID
+B=${ATHENA_BASE_URL:-http://127.0.0.1:8000}
+# 0) project 没设先列出取 pid
+curl -s "$B/projects" -H "X-Athena-Caller: ${ATHENA_CALLER:-athena-skill}"
+P=$ATHENA_PROJECT_ID
 # 1) 提交检索,拿 task id
 TID=$(curl -s -X POST "$B/projects/$P/retrieve" \
   -H 'Content-Type: application/json' -H "X-Athena-Caller: ${ATHENA_CALLER:-athena-skill}" \
@@ -26,8 +30,6 @@ TID=$(curl -s -X POST "$B/projects/$P/retrieve" \
 # 2) 轮询到 completed,读 .content(自行加 sleep/重试)
 curl -s "$B/projects/$P/retrieve/tasks/$TID"
 ```
-
-> 其他命令(concepts / shelf / read / raw / remember)暂时屏蔽,只走 `ask`。
 
 # 货架结构(供理解答案来源)
 

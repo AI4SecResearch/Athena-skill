@@ -154,63 +154,63 @@ def cmd_projects(_args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_shelf(args: argparse.Namespace) -> int:
-    pid = _project(args.project)
-    status, payload = _request("GET", f"/projects/{pid}/knowledge/index",
-                               query={"dir": args.dir or "", "recursive": "true" if args.recursive else "false"})
-    _check_http(status, payload)
-    _print_index(payload, indent=0)
-    return 0
-
-
-def _print_index(node: dict, indent: int) -> None:
-    pad = "  " * indent
-    for d in node.get("directories", []):
-        cnt = d.get("document_count", 0)
-        print(f"{pad}{d.get('path', d.get('name', '?'))}/ ({cnt} docs)")
-        if d.get("children"):
-            _print_index(d, indent + 1)
-    for doc in node.get("documents", []):
-        path = doc.get("path", "?")
-        desc = doc.get("description") or ""
-        topics = doc.get("topic") or []
-        ttag = f" [{', '.join(topics)}]" if topics else ""
-        desc_part = f" — {desc}" if desc else ""
-        print(f"{pad}- {path}{desc_part}{ttag}")
-
-
-def cmd_read(args: argparse.Namespace) -> int:
-    pid = _project(args.project)
-    status, payload = _request("GET", f"/projects/{pid}/knowledge/file",
-                               query={"path": args.path})
-    _check_http(status, payload)
-    if isinstance(payload, dict):
-        sys.stdout.write(payload.get("content", ""))
-        if not payload.get("content", "").endswith("\n"):
-            sys.stdout.write("\n")
-    return 0
-
-
-def cmd_concepts(args: argparse.Namespace) -> int:
-    pid = _project(args.project)
-    status, payload = _request("GET", f"/projects/{pid}/knowledge/concepts",
-                               query={"query": args.query})
-    _check_http(status, payload)
-    if not isinstance(payload, dict):
-        return 0
-    if payload.get("status") != "available":
-        print(f"(concept index {payload.get('status', 'unavailable')})")
-        return 0
-    matches = payload.get("matches", [])
-    if not matches:
-        print("(无匹配)")
-        return 0
-    for m in matches:
-        aliases = m.get("aliases", [])
-        head = aliases[0] if aliases else m.get("group_id", "?")
-        for mention in m.get("mentions", []):
-            print(f"{head} → {mention.get('document_path', '?')}")
-    return 0
+# def cmd_shelf(args: argparse.Namespace) -> int:
+#     pid = _project(args.project)
+#     status, payload = _request("GET", f"/projects/{pid}/knowledge/index",
+#                                query={"dir": args.dir or "", "recursive": "true" if args.recursive else "false"})
+#     _check_http(status, payload)
+#     _print_index(payload, indent=0)
+#     return 0
+#
+#
+# def _print_index(node: dict, indent: int) -> None:
+#     pad = "  " * indent
+#     for d in node.get("directories", []):
+#         cnt = d.get("document_count", 0)
+#         print(f"{pad}{d.get('path', d.get('name', '?'))}/ ({cnt} docs)")
+#         if d.get("children"):
+#             _print_index(d, indent + 1)
+#     for doc in node.get("documents", []):
+#         path = doc.get("path", "?")
+#         desc = doc.get("description") or ""
+#         topics = doc.get("topic") or []
+#         ttag = f" [{', '.join(topics)}]" if topics else ""
+#         desc_part = f" — {desc}" if desc else ""
+#         print(f"{pad}- {path}{desc_part}{ttag}")
+#
+#
+# def cmd_read(args: argparse.Namespace) -> int:
+#     pid = _project(args.project)
+#     status, payload = _request("GET", f"/projects/{pid}/knowledge/file",
+#                                query={"path": args.path})
+#     _check_http(status, payload)
+#     if isinstance(payload, dict):
+#         sys.stdout.write(payload.get("content", ""))
+#         if not payload.get("content", "").endswith("\n"):
+#             sys.stdout.write("\n")
+#     return 0
+#
+#
+# def cmd_concepts(args: argparse.Namespace) -> int:
+#     pid = _project(args.project)
+#     status, payload = _request("GET", f"/projects/{pid}/knowledge/concepts",
+#                                query={"query": args.query})
+#     _check_http(status, payload)
+#     if not isinstance(payload, dict):
+#         return 0
+#     if payload.get("status") != "available":
+#         print(f"(concept index {payload.get('status', 'unavailable')})")
+#         return 0
+#     matches = payload.get("matches", [])
+#     if not matches:
+#         print("(无匹配)")
+#         return 0
+#     for m in matches:
+#         aliases = m.get("aliases", [])
+#         head = aliases[0] if aliases else m.get("group_id", "?")
+#         for mention in m.get("mentions", []):
+#             print(f"{head} → {mention.get('document_path', '?')}")
+#     return 0
 
 
 def cmd_ask(args: argparse.Namespace) -> int:
@@ -249,97 +249,97 @@ def cmd_ask(args: argparse.Namespace) -> int:
     # unreachable
 
 
-def cmd_raw(args: argparse.Namespace) -> int:
-    pid = _project(args.project)
-    body = {
-        "retrieval_task_id": args.task_id,
-        "knowledge_ref": {"scope": "project", "path": args.knowledge_path},
-        "raw_ref": args.raw_ref,
-        "content_budget_tokens": args.budget,
-    }
-    status, payload = _request("POST", f"/projects/{pid}/retrieve/raw", body=body)
-    _check_http(status, payload)
-    if not isinstance(payload, dict):
-        return 0
-    content = payload.get("content", "")
-    sys.stdout.write(content)
-    if not content.endswith("\n"):
-        sys.stdout.write("\n")
-    if payload.get("truncated"):
-        print(f"\n(truncated, used_tokens={payload.get('used_tokens', '?')})", file=sys.stderr)
-    return 0
-
-
-def _multipart(fields: dict[str, str | None], file_field: str,
-               filename: str, content: bytes) -> tuple[bytes, str]:
-    """Build a multipart/form-data body (stdlib only). Returns (body, content_type)."""
-    boundary = "----athena" + os.urandom(16).hex()
-    crlf = b"\r\n"
-    out: list[bytes] = []
-    for name, value in fields.items():
-        if value is None:
-            continue
-        out.append(f"--{boundary}".encode() + crlf)
-        out.append(f'Content-Disposition: form-data; name="{name}"'.encode() + crlf + crlf)
-        out.append(value.encode("utf-8") + crlf)
-    out.append(f"--{boundary}".encode() + crlf)
-    out.append(
-        f'Content-Disposition: form-data; name="{file_field}"; '
-        f'filename="{filename}"'.encode() + crlf
-    )
-    out.append(b"Content-Type: text/markdown; charset=utf-8" + crlf + crlf)
-    out.append(content + crlf)
-    out.append(f"--{boundary}--".encode() + crlf)
-    return b"".join(out), f"multipart/form-data; boundary={boundary}"
-
-
-def cmd_remember(args: argparse.Namespace) -> int:
-    pid = _project(args.project)
-    content = sys.stdin.read()
-    if not content:
-        _die("athena: remember 需从 stdin 读入正文", 1)
-    # 文件名决定 ext 派发；CLI 只递 markdown，故确保 .md 后缀（passthrough）。
-    filename = args.path or "upload.md"
-    if os.path.splitext(filename)[1].lower() not in (".md", ".txt"):
-        filename = f"{filename}.md"
-    fields: dict[str, str | None] = {
-        "classes": ",".join(args.classes) if args.classes else None,
-        "source": args.source,
-    }
-    body, ctype = _multipart(fields, "file", filename, content.encode("utf-8"))
-    status, payload = _request(
-        "POST", f"/projects/{pid}/gate/remember",
-        raw=body, content_type=ctype,
-    )
-    _check_http(status, payload)
-    task_id = payload.get("intake_task_id") if isinstance(payload, dict) else None
-    if not task_id:
-        _die(f"athena: 未返回 intake_task_id: {payload}", 2)
-
-    timeout = int(os.environ.get("ATHENA_INTAKE_TIMEOUT", "300"))
-    deadline = time.monotonic() + timeout
-    backoff = 1.0
-    while True:
-        status, payload = _request("GET", f"/projects/{pid}/gate/tasks/{task_id}")
-        _check_http(status, payload)
-        st = payload.get("status") if isinstance(payload, dict) else None
-        if st == "succeeded":
-            verdict = payload.get("verdict", "?")
-            if verdict == "admit":
-                raw_path = payload.get("raw_path", "")
-                classes = payload.get("classes") or []
-                print(f"admit → {raw_path} (classes: {', '.join(classes) or '—'})")
-            else:
-                print(f"reject → {payload.get('reason', '(no reason)')}")
-            print(f"task_id={task_id}", file=sys.stderr)
-            return 0
-        if st == "failed":
-            err = payload.get("error_class") or payload.get("reason") or "unknown"
-            _die(f"athena: 门禁失败 ({err})", 1)
-        if time.monotonic() >= deadline:
-            _die(f"athena: 门禁超时 ({timeout}s),task_id={task_id}", 2)
-        time.sleep(min(backoff, 5.0))
-        backoff *= 2
+# def cmd_raw(args: argparse.Namespace) -> int:
+#     pid = _project(args.project)
+#     body = {
+#         "retrieval_task_id": args.task_id,
+#         "knowledge_ref": {"scope": "project", "path": args.knowledge_path},
+#         "raw_ref": args.raw_ref,
+#         "content_budget_tokens": args.budget,
+#     }
+#     status, payload = _request("POST", f"/projects/{pid}/retrieve/raw", body=body)
+#     _check_http(status, payload)
+#     if not isinstance(payload, dict):
+#         return 0
+#     content = payload.get("content", "")
+#     sys.stdout.write(content)
+#     if not content.endswith("\n"):
+#         sys.stdout.write("\n")
+#     if payload.get("truncated"):
+#         print(f"\n(truncated, used_tokens={payload.get('used_tokens', '?')})", file=sys.stderr)
+#     return 0
+#
+#
+# def _multipart(fields: dict[str, str | None], file_field: str,
+#                filename: str, content: bytes) -> tuple[bytes, str]:
+#     """Build a multipart/form-data body (stdlib only). Returns (body, content_type)."""
+#     boundary = "----athena" + os.urandom(16).hex()
+#     crlf = b"\r\n"
+#     out: list[bytes] = []
+#     for name, value in fields.items():
+#         if value is None:
+#             continue
+#         out.append(f"--{boundary}".encode() + crlf)
+#         out.append(f'Content-Disposition: form-data; name="{name}"'.encode() + crlf + crlf)
+#         out.append(value.encode("utf-8") + crlf)
+#     out.append(f"--{boundary}".encode() + crlf)
+#     out.append(
+#         f'Content-Disposition: form-data; name="{file_field}"; '
+#         f'filename="{filename}"'.encode() + crlf
+#     )
+#     out.append(b"Content-Type: text/markdown; charset=utf-8" + crlf + crlf)
+#     out.append(content + crlf)
+#     out.append(f"--{boundary}--".encode() + crlf)
+#     return b"".join(out), f"multipart/form-data; boundary={boundary}"
+#
+#
+# def cmd_remember(args: argparse.Namespace) -> int:
+#     pid = _project(args.project)
+#     content = sys.stdin.read()
+#     if not content:
+#         _die("athena: remember 需从 stdin 读入正文", 1)
+#     # 文件名决定 ext 派发；CLI 只递 markdown，故确保 .md 后缀（passthrough）。
+#     filename = args.path or "upload.md"
+#     if os.path.splitext(filename)[1].lower() not in (".md", ".txt"):
+#         filename = f"{filename}.md"
+#     fields: dict[str, str | None] = {
+#         "classes": ",".join(args.classes) if args.classes else None,
+#         "source": args.source,
+#     }
+#     body, ctype = _multipart(fields, "file", filename, content.encode("utf-8"))
+#     status, payload = _request(
+#         "POST", f"/projects/{pid}/gate/remember",
+#         raw=body, content_type=ctype,
+#     )
+#     _check_http(status, payload)
+#     task_id = payload.get("intake_task_id") if isinstance(payload, dict) else None
+#     if not task_id:
+#         _die(f"athena: 未返回 intake_task_id: {payload}", 2)
+#
+#     timeout = int(os.environ.get("ATHENA_INTAKE_TIMEOUT", "300"))
+#     deadline = time.monotonic() + timeout
+#     backoff = 1.0
+#     while True:
+#         status, payload = _request("GET", f"/projects/{pid}/gate/tasks/{task_id}")
+#         _check_http(status, payload)
+#         st = payload.get("status") if isinstance(payload, dict) else None
+#         if st == "succeeded":
+#             verdict = payload.get("verdict", "?")
+#             if verdict == "admit":
+#                 raw_path = payload.get("raw_path", "")
+#                 classes = payload.get("classes") or []
+#                 print(f"admit → {raw_path} (classes: {', '.join(classes) or '—'})")
+#             else:
+#                 print(f"reject → {payload.get('reason', '(no reason)')}")
+#             print(f"task_id={task_id}", file=sys.stderr)
+#             return 0
+#         if st == "failed":
+#             err = payload.get("error_class") or payload.get("reason") or "unknown"
+#             _die(f"athena: 门禁失败 ({err})", 1)
+#         if time.monotonic() >= deadline:
+#             _die(f"athena: 门禁超时 ({timeout}s),task_id={task_id}", 2)
+#         time.sleep(min(backoff, 5.0))
+#         backoff *= 2
 
 
 # --- argparse ------------------------------------------------------------
@@ -360,35 +360,36 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("projects", help="列出所有项目")
     p.set_defaults(func=cmd_projects)
 
-    p = sub.add_parser("shelf", help="浏览知识货架目录(结构化)")
-    p.add_argument("dir", nargs="?", default="", help="货架相对目录(默认根)")
-    p.add_argument("--recursive", action="store_true", help="返回整棵子树")
-    p.set_defaults(func=cmd_shelf)
+    # 暂时屏蔽:只保留 projects(取 pid) + ask。其余命令连同函数一并注释,需要时解注即可。
+    # p = sub.add_parser("shelf", help="浏览知识货架目录(结构化)")
+    # p.add_argument("dir", nargs="?", default="", help="货架相对目录(默认根)")
+    # p.add_argument("--recursive", action="store_true", help="返回整棵子树")
+    # p.set_defaults(func=cmd_shelf)
 
-    p = sub.add_parser("read", help="读单篇 .md 文档正文")
-    p.add_argument("path", help="货架相对路径,如 业务知识/模块A/登录鉴权.md")
-    p.set_defaults(func=cmd_read)
+    # p = sub.add_parser("read", help="读单篇 .md 文档正文")
+    # p.add_argument("path", help="货架相对路径,如 业务知识/模块A/登录鉴权.md")
+    # p.set_defaults(func=cmd_read)
 
-    p = sub.add_parser("concepts", help="概念检索")
-    p.add_argument("query", help="检索词")
-    p.set_defaults(func=cmd_concepts)
+    # p = sub.add_parser("concepts", help="概念检索")
+    # p.add_argument("query", help="检索词")
+    # p.set_defaults(func=cmd_concepts)
 
     p = sub.add_parser("ask", help="自然语言检索(内部轮询,一次出结果)")
     p.add_argument("message", help="检索问题")
     p.set_defaults(func=cmd_ask)
 
-    p = sub.add_parser("raw", help="下钻已完成检索的 raw 证据")
-    p.add_argument("task_id", help="athena ask 末行 stderr 的 task_id")
-    p.add_argument("knowledge_path", help="检索答案证据链里的项目知识路径")
-    p.add_argument("raw_ref", help="raw/*.md 相对路径")
-    p.add_argument("--budget", type=int, default=1600, help="content_budget_tokens (1..32000, 默认 1600)")
-    p.set_defaults(func=cmd_raw)
+    # p = sub.add_parser("raw", help="下钻已完成检索的 raw 证据")
+    # p.add_argument("task_id", help="athena ask 末行 stderr 的 task_id")
+    # p.add_argument("knowledge_path", help="检索答案证据链里的项目知识路径")
+    # p.add_argument("raw_ref", help="raw/*.md 相对路径")
+    # p.add_argument("--budget", type=int, default=1600, help="content_budget_tokens (1..32000, 默认 1600)")
+    # p.set_defaults(func=cmd_raw)
 
-    p = sub.add_parser("remember", help="沉淀知识走门禁入库(POST /gate/remember,内部轮询)")
-    p.add_argument("path", nargs="?", default="", help="上传文件名(可省略,默认 upload.md)")
-    p.add_argument("--source", help="来源标注: 文档|工具|经验")
-    p.add_argument("--classes", nargs="*", help="建议分类(可选)")
-    p.set_defaults(func=cmd_remember)
+    # p = sub.add_parser("remember", help="沉淀知识走门禁入库(POST /gate/remember,内部轮询)")
+    # p.add_argument("path", nargs="?", default="", help="上传文件名(可省略,默认 upload.md)")
+    # p.add_argument("--source", help="来源标注: 文档|工具|经验")
+    # p.add_argument("--classes", nargs="*", help="建议分类(可选)")
+    # p.set_defaults(func=cmd_remember)
 
     args = parser.parse_args(argv)
     _CONFIG.update(base_url=args.base_url, api_key=args.api_key)
