@@ -5,7 +5,7 @@ description: 当无法通过上下文、代码、记忆获取所需信息时，�
 
 # 前置
 
-- **server 必须在跑**；`ATHENA_PROJECT_ID` 环境变量必须已设(pid 从中取)。
+- **server 必须在跑**；pid 从 `ATHENA_PROJECT_ID` 取，环境变量没有就用 `--project <pid>` 显式指定。
 - Bash 里裸 `athena` 不在 PATH：每条命令先设 `A=<路径>/athena.py`，再用 `$A` 代替下文的 `athena`。
   路径：in-repo `athena-skill/athena.py`；用户 skills `~/.claude/skills/athena-skill/athena.py`。
 - 配置项(base-url / project / caller)见 [CLI.md](./CLI.md)。
@@ -17,7 +17,8 @@ description: 当无法通过上下文、代码、记忆获取所需信息时，�
 **CLI**（推荐，内部轮询一次出结果）：
 
 ```
-athena ask "<问题>"
+athena ask "<问题>"                    # pid 取自 ATHENA_PROJECT_ID
+athena --project <pid> ask "<问题>"     # 环境变量没有时显式指定
 ```
 
 **curl**（无 CLI 时；需自己轮询任务）：

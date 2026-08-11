@@ -24,7 +24,7 @@ A=athena-skill/athena.py; $A ask "<问题>"
 
 `ATHENA_CALLER` 自报家门,进 `X-Athena-Caller` 头供查询观测过滤,默认 `athena-skill`;agent 想区分身份时覆盖(如 `argo/api`)。
 
-`ATHENA_PROJECT_ID` 必须已设(pid 从中取)。server 必须在跑。
+pid 从 `ATHENA_PROJECT_ID` 取,环境变量没有就传 `--project <pid>`。server 必须在跑。
 
 # 注
 
