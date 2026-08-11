@@ -5,7 +5,7 @@ description: 当无法通过上下文、代码、记忆获取所需信息时，�
 
 # 前置
 
-- **server 必须在跑**；`project` 未设时先跑 `projects` 取 pid。
+- **server 必须在跑**；`ATHENA_PROJECT_ID` 环境变量必须已设(pid 从中取)。
 - Bash 里裸 `athena` 不在 PATH：每条命令先设 `A=<路径>/athena.py`，再用 `$A` 代替下文的 `athena`。
   路径：in-repo `athena-skill/athena.py`；用户 skills `~/.claude/skills/athena-skill/athena.py`。
 - 配置项(base-url / project / caller)见 [CLI.md](./CLI.md)。
@@ -17,7 +17,6 @@ description: 当无法通过上下文、代码、记忆获取所需信息时，�
 **CLI**（推荐，内部轮询一次出结果）：
 
 ```
-athena projects          # project 未设时先取 pid
 athena ask "<问题>"
 ```
 
@@ -26,7 +25,6 @@ athena ask "<问题>"
 ```bash
 B=${ATHENA_BASE_URL:-http://127.0.0.1:8000}
 C="X-Athena-Caller: ${ATHENA_CALLER:-athena-skill}"
-curl -s "$B/projects" -H "$C"                    # project 未设先取 pid
 P=$ATHENA_PROJECT_ID
 TID=$(curl -s -X POST "$B/projects/$P/retrieve" -H 'Content-Type: application/json' -H "$C" \
   -d '{"message":"<问题>"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["retrieval_task_id"])')

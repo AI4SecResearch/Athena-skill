@@ -9,14 +9,8 @@ K8s: 在 pod 内运行且未设 ATHENA_BASE_URL 时，自动指向集群内 Serv
 （CLI 走 base_url+path 裸拼接，故前缀必须并入 base_url；直连 Service 是
 plain HTTP，不经 ingress 自签证书）。仅需设 ATHENA_PROJECT_ID 即可用。"""
 
-# 命令 ↔ API 映射 ({pid}=project id;路径均货架相对,如 业务知识/模块A/登录鉴权.md):
-#   projects                                    → GET  /projects
-#   shelf [DIR] [--recursive]                   → GET  /projects/{pid}/knowledge/index?dir=&recursive=
-#   read <PATH>                                 → GET  /projects/{pid}/knowledge/file?path=
-#   concepts <QUERY>                            → GET  /projects/{pid}/knowledge/concepts?query=
+# 命令 ↔ API 映射 ({pid}=project id,取自 ATHENA_PROJECT_ID;路径均货架相对,如 业务知识/模块A/登录鉴权.md):
 #   ask "<MESSAGE>"                             → POST /projects/{pid}/retrieve  (+轮询 GET .../retrieve/tasks/{id})
-#   raw <TASK_ID> <KNOW_PATH> <RAW_REF> [--budget N] → POST /projects/{pid}/retrieve/raw
-#   remember [PATH] [--source S] [--classes ...] (stdin) → POST /projects/{pid}/gate/remember  (multipart file, +轮询 GET .../gate/tasks/{id})
 
 from __future__ import annotations
 
@@ -119,39 +113,39 @@ def _check_http(status: int, payload: object) -> None:
 def _project(arg: str | None) -> str:
     pid = arg or os.environ.get("ATHENA_PROJECT_ID")
     if not pid:
-        _die("athena: 缺少 project_id。设置 ATHENA_PROJECT_ID 或传 --project,先用 `athena projects` 查。", 1)
+        _die("athena: 缺少 project_id。设置 ATHENA_PROJECT_ID 环境变量或传 --project。", 1)
     return pid
 
 
 # --- subcommands ---------------------------------------------------------
 
-def cmd_projects(_args: argparse.Namespace) -> int:
-    items: list = []
-    cursor: str | None = None
-    while True:
-        status, payload = _request("GET", "/projects", query={"cursor": cursor} if cursor else None)
-        _check_http(status, payload)
-        if isinstance(payload, dict):
-            items.extend(payload.get("items", []))
-            cursor = payload.get("next_cursor")
-            if not cursor:
-                break
-        elif isinstance(payload, list):  # bare-array fallback
-            items.extend(payload)
-            break
-        else:
-            break
-    if not items:
-        print("(无项目)")
-        return 0
-    for it in items:
-        pid = it.get("project_id", "?")
-        name = it.get("name", "?")
-        st = it.get("initialization_status", "?")
-        domain = it.get("domain")
-        tail = f" ({domain})" if domain else ""
-        print(f"{pid} | {name} | {st}{tail}")
-    return 0
+# def cmd_projects(_args: argparse.Namespace) -> int:
+#     items: list = []
+#     cursor: str | None = None
+#     while True:
+#         status, payload = _request("GET", "/projects", query={"cursor": cursor} if cursor else None)
+#         _check_http(status, payload)
+#         if isinstance(payload, dict):
+#             items.extend(payload.get("items", []))
+#             cursor = payload.get("next_cursor")
+#             if not cursor:
+#                 break
+#         elif isinstance(payload, list):  # bare-array fallback
+#             items.extend(payload)
+#             break
+#         else:
+#             break
+#     if not items:
+#         print("(无项目)")
+#         return 0
+#     for it in items:
+#         pid = it.get("project_id", "?")
+#         name = it.get("name", "?")
+#         st = it.get("initialization_status", "?")
+#         domain = it.get("domain")
+#         tail = f" ({domain})" if domain else ""
+#         print(f"{pid} | {name} | {st}{tail}")
+#     return 0
 
 
 # def cmd_shelf(args: argparse.Namespace) -> int:
@@ -357,10 +351,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="项目 ID(默认 ATHENA_PROJECT_ID)")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("projects", help="列出所有项目")
-    p.set_defaults(func=cmd_projects)
+    # projects 命令已注释:强制从 ATHENA_PROJECT_ID 取 pid。
+    # p = sub.add_parser("projects", help="列出所有项目")
+    # p.set_defaults(func=cmd_projects)
 
-    # 暂时屏蔽:只保留 projects(取 pid) + ask。其余命令连同函数一并注释,需要时解注即可。
+    # 暂时屏蔽:只保留 ask。其余命令连同函数一并注释,需要时解注即可。
     # p = sub.add_parser("shelf", help="浏览知识货架目录(结构化)")
     # p.add_argument("dir", nargs="?", default="", help="货架相对目录(默认根)")
     # p.add_argument("--recursive", action="store_true", help="返回整棵子树")
