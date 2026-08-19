@@ -4,10 +4,12 @@ Retrieval's async poll is closed inside `ask`; caller gets clean markdown on
 stdout. Stdlib only. Env: ATHENA_BASE_URL, ATHENA_PROJECT_ID, ATHENA_API_KEY,
 ATHENA_RETRIEVE_TIMEOUT.
 
-K8s: 在 pod 内运行且未设 ATHENA_BASE_URL 时，自动指向集群内 Service
-`athena-api.secflow-ns.svc.cluster.local:8000` 的 `/api/athena` 前缀
-（CLI 走 base_url+path 裸拼接，故前缀必须并入 base_url；直连 Service 是
-plain HTTP，不经 ingress 自签证书）。仅需设 ATHENA_PROJECT_ID 即可用。"""
+K8s: 在 pod 内运行且未设 ATHENA_BASE_URL 时，优先用 k8s 注入的 Service
+发现变量 `ATHENA_API_SERVICE_HOST` / `ATHENA_API_SERVICE_PORT` 拼出直连地址
+（同命名空间 pod 自动注入，与 k8s 环境一致，Service 改名/迁命名空间自动跟随）；
+env 缺失时退到 ClusterDNS `athena-api.secflow-ns.svc.cluster.local:8000`。
+均带 `/api/athena` 前缀（CLI 走 base_url+path 裸拼接，故前缀并入 base_url；
+直连 Service 是 plain HTTP，不经 ingress 自签证书）。仅需设 ATHENA_PROJECT_ID。"""
 
 # 命令 ↔ API 映射 ({pid}=project id,取自 ATHENA_PROJECT_ID;路径均货架相对,如 业务知识/模块A/登录鉴权.md):
 #   ask "<MESSAGE>"                             → POST /projects/{pid}/retrieve  (+轮询 GET .../retrieve/tasks/{id})
@@ -31,9 +33,14 @@ def _base_url() -> str:
     configured = _CONFIG.get("base_url") or os.environ.get("ATHENA_BASE_URL")
     if configured:
         return configured.rstrip("/")
-    # K8s pod: 直连集群内 athena-api Service（plain HTTP，带 /api/athena 前缀）。
-    # KUBERNETES_SERVICE_HOST 由 kubelet 注入每个 pod；本地无此变量。
+    # K8s pod: 优先用 kubelet 给同命名空间 pod 注入的 Service 发现变量
+    # （ATHENA_API_SERVICE_HOST/PORT），与 k8s 环境一致，Service 改名/迁命名空间自动跟随。
+    # 仅在 env 缺失时退到 ClusterDNS（写死 <svc>.<ns>.svc.cluster.local）。
     if os.environ.get("KUBERNETES_SERVICE_HOST"):
+        host = os.environ.get("ATHENA_API_SERVICE_HOST")
+        port = os.environ.get("ATHENA_API_SERVICE_PORT") or "8000"
+        if host:
+            return f"http://{host}:{port}/api/athena"
         return "http://athena-api.secflow-ns.svc.cluster.local:8000/api/athena"
     return "http://127.0.0.1:8000"
 
@@ -344,7 +351,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Athena 知识货架 CLI(给 Claude Code skill 用)",
     )
     parser.add_argument("--base-url", default=None,
-                        help="Athena server URL(默认 ATHENA_BASE_URL 或 http://127.0.0.1:8000)")
+                        help="Athena server URL(默认 ATHENA_BASE_URL；未设时 K8s pod 内用注入的 athena-api Service 地址，本地 http://127.0.0.1:8000)")
     parser.add_argument("--api-key", default=None,
                         help="可选鉴权(默认 ATHENA_API_KEY)")
     parser.add_argument("--project", default=None,
