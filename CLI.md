@@ -9,7 +9,7 @@
 ```bash
 A=~/.claude/skills/athena-skill/athena.py
 # 开发态(in-repo)用源码相对路径：A=athena-skill/athena.py
-# 自发现兜底：command -v athena >/dev/null 2>&1 && A=athena || A=$(find ~/.claude/skills /app/src -maxdepth 3 -path '*athena-skill/athena.py' 2>/dev/null | head -1)
+# 若已把软链建到 PATH（ln -sf …/athena.py ~/.local/bin/athena）：A=athena
 
 $A ask "<问题>"
 ```
