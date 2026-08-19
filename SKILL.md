@@ -13,8 +13,8 @@ description: 当无法通过上下文、代码、记忆获取所需信息时，�
   A=~/.claude/skills/athena-skill/athena.py
   # 开发态(in-repo, skill 还没装到标准位置)用源码相对路径：
   # A=athena-skill/athena.py
-  # 保险起见，若上面路径不存在，按名字自发现：
-  command -v athena >/dev/null 2>&1 && A=athena || A=$(find ~/.claude/skills /app/src -maxdepth 3 -path '*athena-skill/athena.py' 2>/dev/null | head -1)
+  # 若已把软链建到 PATH（ln -sf …/athena.py ~/.local/bin/athena），直接：
+  # A=athena
   ```
 
 - 配置项(base-url / project / caller)见 [CLI.md](./CLI.md)。
