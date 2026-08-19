@@ -4,17 +4,19 @@
 
 # 调用
 
-`athena.py` 已可执行(shebang `python3`)。每条 Bash 命令先 `A=<路径>`,再用 `$A` 代 `athena`:
+`athena.py` 已可执行(shebang `python3`)。裸 `athena` 不在 PATH：每条 Bash 命令开头先把 `A` 指向 skill 目录里的 `athena.py` 绝对路径，再用 `$A` 代 `athena`。skill 在 Claude Code 标准位置，路径固定，不依赖 cwd：
 
 ```bash
-A=athena-skill/athena.py; $A ask "<问题>"
-```
+A=~/.claude/skills/athena-skill/athena.py
+# 开发态(in-repo)用源码相对路径：A=athena-skill/athena.py
+# 若已把软链建到 PATH（ln -sf …/athena.py ~/.local/bin/athena）：A=athena
 
-路径:in-repo `athena-skill/athena.py`;用户 skills `~/.claude/skills/athena-skill/athena.py`。
+$A ask "<问题>"
+```
 
 # Config
 
-默认 server `http://127.0.0.1:8000`。用 env 或 subcommand 前的全局 flag 覆盖:
+默认 server `http://127.0.0.1:8000`；K8s pod 内未设 `ATHENA_BASE_URL` 时自动指向集群内 `athena-api` Service（`/api/athena` 前缀，plain HTTP，绕开 ingress 自签证书）。用 env 或 subcommand 前的全局 flag 覆盖:
 
 | | env | flag |
 |---|---|---|

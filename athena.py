@@ -4,10 +4,11 @@ Retrieval's async poll is closed inside `ask`; caller gets clean markdown on
 stdout. Stdlib only. Env: ATHENA_BASE_URL, ATHENA_PROJECT_ID, ATHENA_API_KEY,
 ATHENA_RETRIEVE_TIMEOUT.
 
-K8s: 在 pod 内运行且未设 ATHENA_BASE_URL 时，自动指向集群内 Service
-`athena-api.secflow-ns.svc.cluster.local:8000` 的 `/api/athena` 前缀
-（CLI 走 base_url+path 裸拼接，故前缀必须并入 base_url；直连 Service 是
-plain HTTP，不经 ingress 自签证书）。仅需设 ATHENA_PROJECT_ID 即可用。"""
+K8s: 在 pod 内运行且未设 ATHENA_BASE_URL 时，指向集群内 Service 的
+ClusterDNS `athena-api.secflow-ns.svc.cluster.local:8000`（带 `/api/athena`
+前缀；CLI 走 base_url+path 裸拼接，故前缀并入 base_url；直连 Service 是
+plain HTTP，不经 ingress 自签证书）。用域名而非注入的 Service IP，DNS
+稳定可读、不受 ClusterIP 重建影响。仅需设 ATHENA_PROJECT_ID。"""
 
 # 命令 ↔ API 映射 ({pid}=project id,取自 ATHENA_PROJECT_ID;路径均货架相对,如 业务知识/模块A/登录鉴权.md):
 #   ask "<MESSAGE>"                             → POST /projects/{pid}/retrieve  (+轮询 GET .../retrieve/tasks/{id})
@@ -31,7 +32,8 @@ def _base_url() -> str:
     configured = _CONFIG.get("base_url") or os.environ.get("ATHENA_BASE_URL")
     if configured:
         return configured.rstrip("/")
-    # K8s pod: 直连集群内 athena-api Service（plain HTTP，带 /api/athena 前缀）。
+    # K8s pod: 直连集群内 athena-api Service 的 ClusterDNS（plain HTTP，带 /api/athena 前缀）。
+    # 用域名而非 kubelet 注入的 ATHENA_API_SERVICE_HOST（那是 Service IP，会随重建变化）。
     # KUBERNETES_SERVICE_HOST 由 kubelet 注入每个 pod；本地无此变量。
     if os.environ.get("KUBERNETES_SERVICE_HOST"):
         return "http://athena-api.secflow-ns.svc.cluster.local:8000/api/athena"
@@ -344,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Athena 知识货架 CLI(给 Claude Code skill 用)",
     )
     parser.add_argument("--base-url", default=None,
-                        help="Athena server URL(默认 ATHENA_BASE_URL 或 http://127.0.0.1:8000)")
+                        help="Athena server URL(默认 ATHENA_BASE_URL；未设时 K8s pod 内用 athena-api Service 域名，本地 http://127.0.0.1:8000)")
     parser.add_argument("--api-key", default=None,
                         help="可选鉴权(默认 ATHENA_API_KEY)")
     parser.add_argument("--project", default=None,
