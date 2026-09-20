@@ -221,7 +221,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
     if not task_id:
         _die(f"athena: 未返回 task id: {payload}", 2)
 
-    timeout = int(os.environ.get("ATHENA_RETRIEVE_TIMEOUT", "180"))
+    timeout = int(os.environ.get("ATHENA_RETRIEVE_TIMEOUT", "1200"))
     deadline = time.monotonic() + timeout
     backoff = 1.0
     while True:
